@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import com.example.suivreapp.model.Doctor;
 import com.example.suivreapp.model.Patient;
+import com.example.suivreapp.model.User;
 import com.example.suivreapp.repository.DoctorRepository;
 import com.example.suivreapp.repository.PatientRepository;
 
@@ -43,7 +44,7 @@ public class PatientService {
         // Save the patient and return the saved entity
         return patientRepository.save(patient);
     }
-
+   
     public Optional<Patient> getPatientByIdAndDoctor(Long patientId, Doctor doctor) {
         return patientRepository.findByIdAndDoctor(patientId, doctor);
     }

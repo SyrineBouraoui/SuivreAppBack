@@ -2,6 +2,7 @@ package com.example.suivreapp.controller;
 
 import com.example.suivreapp.model.LoginRequest;
 import com.example.suivreapp.model.Patient;
+import com.example.suivreapp.model.ResetPasswordRequest;
 import com.example.suivreapp.model.Role;
 import com.example.suivreapp.model.SignupRequest;
 import com.example.suivreapp.model.User;
@@ -12,11 +13,24 @@ import com.example.suivreapp.repository.PatientRepository;
 import com.example.suivreapp.repository.UserRepository;
 import com.example.suivreapp.model.AuthResponse;
 import com.example.suivreapp.model.Doctor;
+import com.example.suivreapp.model.ForgotPasswordRequest;
 import com.example.suivreapp.model.JwtResponse;
 import com.example.suivreapp.service.AuthService; // Service to handle authentication logic
+import com.example.suivreapp.service.EmailService;
 import com.example.suivreapp.service.JwtService;
 import com.example.suivreapp.service.UserService;
+
+
+import org.json.JSONObject;
+
+import io.jsonwebtoken.JwtException;
+import jakarta.mail.MessagingException;
+
 import java.security.Provider.Service;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -36,6 +50,11 @@ public class AuthController {
     @Autowired
     private UserService userService;
 
+
+    @Autowired
+    private EmailService emailService;
+
+    
     @Autowired
     private JwtService JwtService;
 
@@ -115,13 +134,17 @@ public class AuthController {
 
             patientRepository.save(patient);
         } 
+        else if ("admin".equalsIgnoreCase(signupRequest.getRole())) {
+            // ADMIN has no additional entity to create (no doctor or patient)
+            userRepository.save(user);
+        }
+
         else {
             return ResponseEntity.badRequest().body("Error: Invalid role!");
         }
 
         return ResponseEntity.ok("User registered successfully!");
     }
-    
 
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@RequestBody LoginRequest loginRequest) {
@@ -136,7 +159,7 @@ public class AuthController {
             System.out.println("User ID: " + user.getId());  // Log user ID to confirm it's valid
 
             // Generate JWT Token for the authenticated user
-            String token = JwtService.generateToken(user);
+            String token = JwtService.generateAuthToken(user);
             System.out.println("Generated Token Length: " + token.length());
 
             // Debugging: Log the generated token
@@ -175,25 +198,77 @@ public class AuthController {
     }
 
 
+    
+    
+    @PostMapping("/forgot-password")
+    public ResponseEntity<String> forgotPassword(@RequestBody ForgotPasswordRequest request) {
+        System.out.println(">>> Forgot password endpoint hit for: " + request.getEmail());
 
-    
-    
-    @PostMapping("/verify")
-    public ResponseEntity<?> verifyUser(@RequestBody VerifyUserDto verifyUserDto) {
+        Optional<User> userOptional = userRepository.findByEmail(request.getEmail());
+        if (!userOptional.isPresent()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Utilisateur non trouvé avec l'e-mail fourni.");
+        }
+
+        String token = JwtService.generateResetToken(request.getEmail());
+        String resetLink = "http://localhost:4200/forgot-password?token=" + token;
+
         try {
-            authService.verifyUser(verifyUserDto);
-            return ResponseEntity.ok("Account verified successfully");
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            emailService.sendPasswordResetEmail(request.getEmail(), resetLink);
+        } catch (MessagingException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Erreur lors de l'envoi de l'e-mail.");
+        }
+
+        return ResponseEntity.ok("Lien de réinitialisation envoyé.");
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<Map<String, String>> resetPassword(@RequestBody ResetPasswordRequest request) {
+        String token = request.getToken();
+        String newPassword = request.getNewPassword(); 
+
+        try {
+            // Extract email from token
+            String email = extractEmailFromJwt(token);
+
+            // Find the user by email
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+
+            // Encode the new password
+            String encodedPassword = passwordEncoder.encode(newPassword);
+
+            // Update and save the user
+            user.setPassword(encodedPassword);
+            userRepository.save(user);
+
+            // Return a JSON response with a "message" field
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Password reset successful");
+            return ResponseEntity.ok(response);  // Returning JSON response
+
+        } catch (Exception e) {
+            // Return error as JSON too
+            Map<String, String> errorResponse = new HashMap();
+            errorResponse.put("error", "Error resetting password: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
         }
     }
 
-    @PostMapping("/resend")
-    public ResponseEntity<?> resendVerificationCode(@RequestParam String email) {
-        try {
-            authService.resendVerificationCode(email);
-            return ResponseEntity.ok("Verification code sent");
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
-}}
+    
+
+    public String extractEmailFromJwt(String token) {
+        String[] parts = token.split("\\.");
+        if (parts.length != 3) throw new IllegalArgumentException("Invalid JWT token");
+
+        String payloadJson = new String(Base64.getDecoder().decode(parts[1]));
+
+        System.out.println("Decoded Payload: " + payloadJson);
+
+        // Extract "sub" field (email) using regex
+        String email = payloadJson.replaceAll(".*\"sub\":\"([^\"]+)\".*", "$1");
+        return email;
+    }
+
+
+    
+   }

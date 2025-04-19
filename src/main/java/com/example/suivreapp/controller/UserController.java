@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.example.suivreapp.controller.PatientController.PatientResponse;
 import com.example.suivreapp.model.AuthResponse;
@@ -28,14 +30,19 @@ import com.example.suivreapp.model.DoctorDTO;
 import com.example.suivreapp.model.DoctorResponse;
 import com.example.suivreapp.model.Patient;
 import com.example.suivreapp.model.User;
+import com.example.suivreapp.model.Role;
+
 import com.example.suivreapp.model.UserDTO;
 import com.example.suivreapp.model.UserResponse;
+import com.example.suivreapp.model.UserUpdateRequest;
 import com.example.suivreapp.repository.UserRepository;
 import com.example.suivreapp.service.PatientService;
 import com.example.suivreapp.service.UserService;
+
+import jakarta.transaction.Transactional;
+
 import java.util.stream.Collectors;
 
-import javax.management.relation.Role;
 
 @RestController
 @RequestMapping("/api/users")
@@ -81,11 +88,38 @@ public class UserController {
 	        return ResponseEntity.ok(userResponse);
 	    }
 	 
-	
 	 @PutMapping("/{id}")
-	    public User updateUser(@PathVariable Long id, @RequestBody User user) {
-	      user.setId(id);
-	        return userRepository.save(user);
+	    @Transactional
+	    public ResponseEntity<UserResponse> updateUser(@PathVariable Long id, @RequestBody UserUpdateRequest updateRequest) {
+	        if (!userRepository.existsById(id)) {
+	            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with id: " + id);
+	        }
+
+	        try {
+	            // Fetch and update the user
+	            User existingUser = userRepository.findById(id)
+	                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with id: " + id));
+
+	            existingUser.setUsername(updateRequest.getUsername());
+	            existingUser.setEmail(updateRequest.getEmail());
+	            existingUser.setRole(Role.valueOf(updateRequest.getRole().toUpperCase()));
+	            existingUser.setDoctorId(updateRequest.getDoctorId());
+
+	            // Save updated user
+	            User updatedUser = userRepository.save(existingUser);
+
+	            // Map to DTO for response
+	            UserDTO userDTO = new UserDTO(
+	                    updatedUser.getId(),
+	                    updatedUser.getUsername(),
+	                    updatedUser.getEmail(),
+	                    updatedUser.getRole()
+	            );
+	            UserResponse userResponse = new UserResponse(userDTO);
+	            return ResponseEntity.ok(userResponse);
+	        } catch (IllegalArgumentException e) {
+	            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid role: " + updateRequest.getRole());
+	        }
 	    }
 
 	    // Delete a doctor

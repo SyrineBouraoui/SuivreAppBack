@@ -1,28 +1,40 @@
 package com.example.suivreapp.service;
 
 
-
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
-
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
 
 @Service
 public class EmailService {
-    @Autowired
-    private static JavaMailSender emailSender;
 
-    public static void sendVerificationEmail(String to, String subject, String text) throws MessagingException {
-        MimeMessage message = emailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, true);
+    @Autowired(required = false) // Allow testing without email setup
+    private JavaMailSender mailSender;
 
+    public void sendPasswordResetEmail(String to, String resetLink) throws MessagingException {
+        if (mailSender == null) {
+            System.out.println("Email not configured. Reset Link: " + resetLink);
+            return;
+        }
+
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8"); // Specify encoding
         helper.setTo(to);
-        helper.setSubject(subject);
-        helper.setText(text, true);
-
-        emailSender.send(message);
+        helper.setSubject("Réinitialisation de votre mot de passe");
+        helper.setText(
+            "<h3>Réinitialisation de mot de passe</h3>" +
+            "<p>Vous avez demandé à réinitialiser votre mot de passe. Cliquez sur le lien ci-dessous pour procéder :</p>" +
+            "<a href=\"" + resetLink + "\">Réinitialiser mon mot de passe</a>" +
+            "<p>Ce lien expire dans 24 heures.</p>" +
+            "<p>Si vous n'avez pas fait cette demande, ignorez cet e-mail.</p>",
+            true
+        );
+        mailSender.send(message);
     }
+
+
+	
 }

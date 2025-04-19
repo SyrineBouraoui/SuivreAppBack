@@ -17,16 +17,7 @@ import jakarta.mail.MessagingException;
         @Autowired
         private EmailService emailService;
 
-        @PostMapping("/send")
-        public String sendEmail(@RequestParam String toEmail,
-                                @RequestParam String subject,
-                                @RequestParam String message) {
-            try {
-                emailService.sendVerificationEmail(toEmail, subject, message);
-                return "Email sent successfully!";
-            } catch (MessagingException e) {
-                return "Failed to send email: " + e.getMessage();
-            }
+
         }
-    }
+    
 

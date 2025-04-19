@@ -1,5 +1,6 @@
 package com.example.suivreapp.controller;
 
+import java.lang.System.Logger;
 import java.nio.file.AccessDeniedException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -29,6 +30,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.example.suivreapp.config.CustomUserDetails;
 import com.example.suivreapp.model.Doctor;
 import com.example.suivreapp.model.Patient;
+import com.example.suivreapp.model.PatientDTO;
 import com.example.suivreapp.model.User;
 import com.example.suivreapp.repository.DoctorRepository;
 import com.example.suivreapp.repository.PatientRepository;
@@ -61,11 +63,19 @@ public class PatientController {
 	@Autowired
 	private JwtService jwtService;
 
-	// Get all patients
 	@GetMapping
-	public List<Patient> getAllPatients() {
-		return patientRepository.findAll();
-	}
+	public List<PatientDTO> getAllPatients() {
+        List<Patient> patients = patientRepository.findAll();
+        return patients.stream()
+            .map(patient -> new PatientDTO(
+                patient.getId(),
+                patient.getName(),
+                patient.getEmail(),
+                patient.getUser() != null ? patient.getUser().getId() : null,
+                patient.getDoctor() != null ? patient.getDoctor().getId() : null
+            ))
+            .collect(Collectors.toList());
+    }
 	
 	@GetMapping("/{patientId}/impersonate")
 	public ResponseEntity<?> impersonatePatient(
@@ -117,11 +127,11 @@ public class PatientController {
 	    Patient patient = optionalPatient.get();
 	    System.out.println("Impersonating patient: " + patient.getName() + " (ID: " + patient.getId() + ")");
 
-	    String token = jwtService.generateToken(patient);
+	    //String token = jwtService.generateAuthToken(patient);
 
 	    // Create a response object to include both the token and the patient's name
 	    Map<String, Object> response = new HashMap<>();
-	    response.put("token", token);
+	    //response.put("token", token);
 	    response.put("patientName", patient.getName()); // Include patient's name in the response
 
 	    // Return the response with the token and patient name

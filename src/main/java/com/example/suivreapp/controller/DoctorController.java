@@ -1,8 +1,14 @@
 package com.example.suivreapp.controller;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -127,19 +133,13 @@ public class DoctorController {
     
     
 
-	
-
-    
-    
-    
-    
-    
-    // Get all doctors
     @GetMapping
-    public List<Doctor> getAllDoctors() {
-        return doctorRepository.findAll();
+    public List<DoctorDTO> getAllDoctors() {
+        List<Doctor> doctors = doctorRepository.findAll();
+        return doctors.stream()
+            .map(doctor -> new DoctorDTO(doctor.getId(), doctor.getName(), doctor.getEmail()))
+            .collect(Collectors.toList());
     }
-    // Get doctor by id
   
 
     // Add a new doctor
@@ -147,14 +147,21 @@ public class DoctorController {
 	public ResponseEntity<Doctor> registerDoctor(@RequestBody Doctor doctor) {
 	    Doctor savedDoctor = doctorService.registerDoctor(doctor);
 	    return ResponseEntity.ok(savedDoctor);}
-
-    // Update a doctor
     @PutMapping("/{id}")
-    public Doctor updateDoctor(@PathVariable Long id, @RequestBody Doctor doctor) {
-        doctor.setId(id);
-        return doctorRepository.save(doctor);
+    public ResponseEntity<DoctorDTO> updateDoctor(@PathVariable Long id, @RequestBody DoctorDTO doctorDTO) {
+        Optional<Doctor> existingDoctor = doctorRepository.findById(id);
+        if (existingDoctor.isPresent()) {
+            Doctor doctor = existingDoctor.get();
+            doctor.setName(doctorDTO.getName());
+            doctor.setEmail(doctorDTO.getEmail());
+            Doctor updatedDoctor = doctorRepository.save(doctor);
+            // Map the updated Doctor back to DoctorDTO
+            DoctorDTO responseDTO = new DoctorDTO(updatedDoctor.getId(), updatedDoctor.getName(), updatedDoctor.getEmail());
+            return ResponseEntity.ok(responseDTO);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
     }
-
     // Delete a doctor
     @DeleteMapping("/{id}")
     public void deleteDoctor(@PathVariable Long id) {

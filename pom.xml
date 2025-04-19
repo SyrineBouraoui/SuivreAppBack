@@ -22,6 +22,16 @@
 			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
 		
+		
+		
+		<dependency>
+    <groupId>org.json</groupId>
+    <artifactId>json</artifactId>
+    <version>20210307</version> <!-- You can check for the latest version -->
+        <scope>compile</scope> <!-- or remove the <scope> tag entirely -->
+
+</dependency>
+
 		<dependency>
     <groupId>javax.mail</groupId>
     <artifactId>javax.mail-api</artifactId>
@@ -127,6 +137,13 @@
 			<version>4.0.1</version> <!-- or the version compatible with your environment -->
 			<scope>provided</scope>
 		</dependency>
+		
+		
+		<dependency>
+        <groupId>org.projectlombok</groupId>
+        <artifactId>lombok</artifactId>
+        <optional>true</optional>
+    </dependency>
 	</dependencies>
 
 	<build>

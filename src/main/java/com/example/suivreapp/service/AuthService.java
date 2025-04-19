@@ -13,6 +13,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.example.suivreapp.model.AuthResponse;
@@ -26,6 +27,7 @@ import com.example.suivreapp.repository.DoctorRepository;
 import com.example.suivreapp.repository.PatientRepository;
 import com.example.suivreapp.repository.UserRepository;
 
+import io.jsonwebtoken.JwtException;
 import jakarta.mail.MessagingException;
 
 
@@ -46,10 +48,51 @@ public class AuthService {
     @Autowired
     private AuthenticationManager authenticationManager;
 
-    
-    
+   
+
     @Autowired
-    private BCryptPasswordEncoder passwordEncoder; // To handle password hashing
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private EmailService emailService;
+
+    
+
+    public String forgotPassword(String email) {
+        Optional<User> userOptional = userRepository.findByEmail(email);
+        if (!userOptional.isPresent()) {
+            return "Utilisateur non trouvé avec l'e-mail fourni.";
+        }
+
+        String token = jwtService.generateResetToken(email); // Delegate to JwtService
+        String resetLink = "http://192.168.1.8:4200/reset-password?token=" + token;
+        try {
+            emailService.sendPasswordResetEmail(email, resetLink);
+        } catch (MessagingException e) {
+            return "Erreur lors de l'envoi de l'e-mail de réinitialisation.";
+        }
+
+        return "Lien de réinitialisation envoyé à votre e-mail.";
+    }
+
+    public String resetPassword(String token, String newPassword) {
+        try {
+            String email = jwtService.extractEmailFromResetToken(token); // Delegate to JwtService
+            Optional<User> userOptional = userRepository.findByEmail(email);
+            if (!userOptional.isPresent()) {
+                return "Utilisateur non trouvé.";
+            }
+
+            User user = userOptional.get();
+            user.setPassword(passwordEncoder.encode(newPassword));
+            userRepository.save(user);
+            return "Mot de passe réinitialisé avec succès.";
+        } catch (JwtException e) {
+            return "Jeton invalide ou expiré.";
+        }
+    }
+    
+
 
     public AuthResponse authenticateUser(LoginRequest loginRequest) {
         // Find user by email
@@ -66,7 +109,7 @@ public class AuthService {
                 new UsernamePasswordAuthenticationToken(user.getEmail(), loginRequest.getPassword()));
 
         // Generate JWT Token
-        String token = jwtService.generateToken(user);
+        String token = jwtService.generateAuthToken(user);
 
         
         Long patientId = null;
@@ -107,69 +150,5 @@ public class AuthService {
     }
 
     
-    
-    public void verifyUser(VerifyUserDto input) {
-        Optional<User> optionalUser = userRepository.findByEmail(input.getEmail());
-        if (optionalUser.isPresent()) {
-            User user = optionalUser.get();
-            if (user.getVerificationCodeExpiresAt().isBefore(LocalDateTime.now())) {
-                throw new RuntimeException("Verification code has expired");
-            }
-            if (user.getVerificationCode().equals(input.getVerificationCode())) {
-                user.setEnabled(true);
-                user.setVerificationCode(null);
-                user.setVerificationCodeExpiresAt(null);
-                userRepository.save(user);
-            } else {
-                throw new RuntimeException("Invalid verification code");
-            }
-        } else {
-            throw new RuntimeException("User not found");
-        }
-    }
-
-    public void resendVerificationCode(String email) {
-        Optional<User> optionalUser = userRepository.findByEmail(email);
-        if (optionalUser.isPresent()) {
-            User user = optionalUser.get();
-            if (user.isEnabled()) {
-                throw new RuntimeException("Account is already verified");
-            }
-            user.setVerificationCode(generateVerificationCode());
-            user.setVerificationCodeExpiresAt(LocalDateTime.now().plusHours(1));
-            sendVerificationEmail(user);
-            userRepository.save(user);
-        } else {
-            throw new RuntimeException("User not found");
-        }
-    }
-
-    private void sendVerificationEmail(User user) { //TODO: Update with company logo
-        String subject = "Account Verification";
-        String verificationCode = "VERIFICATION CODE " + user.getVerificationCode();
-        String htmlMessage = "<html>"
-                + "<body style=\"font-family: Arial, sans-serif;\">"
-                + "<div style=\"background-color: #f5f5f5; padding: 20px;\">"
-                + "<h2 style=\"color: #333;\">Welcome to our app!</h2>"
-                + "<p style=\"font-size: 16px;\">Please enter the verification code below to continue:</p>"
-                + "<div style=\"background-color: #fff; padding: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1);\">"
-                + "<h3 style=\"color: #333;\">Verification Code:</h3>"
-                + "<p style=\"font-size: 18px; font-weight: bold; color: #007bff;\">" + verificationCode + "</p>"
-                + "</div>"
-                + "</div>"
-                + "</body>"
-                + "</html>";
-
-        try {
-            EmailService.sendVerificationEmail(user.getEmail(), subject, htmlMessage);
-        } catch (MessagingException e) {
-            // Handle email sending exception
-            e.printStackTrace();
-        }
-    }
-    private String generateVerificationCode() {
-        Random random = new Random();
-        int code = random.nextInt(900000) + 100000;
-        return String.valueOf(code);
-    }
+   
 }
