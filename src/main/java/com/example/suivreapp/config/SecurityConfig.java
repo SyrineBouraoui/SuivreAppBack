@@ -60,7 +60,7 @@ public class SecurityConfig {
         .cors().and() 
         .csrf(csrf -> csrf.disable())
             .authorizeRequests()
-                .requestMatchers("/api/auth/login", "/api/auth/signup", "/api/auth/reset-password","/api/auth/forgot-password", "/api/users", "/api/users/**",  "/api/users/{id}" ,"/api/doctors/**", "/api/doctors/{id}" , "/api/patients/{patientId}/impersonate", "/api/patients/**", "/api/alerts/send-sms", "/api/messages/**", "/api/sensor/data", "/api/sensor/data/**").permitAll()
+                .requestMatchers("/api/auth/login", "/api/auth/signup", "/api/auth/reset-password","/api/auth/forgot-password", "/api/users", "/api/users/**",  "/api/users/{id}" ,"/api/doctors/**", "/api/doctors/{id}" , "/api/patients/{patientId}/impersonate", "/api/patients/**", "/api/alerts/send-sms", "/api/messages/**", "/api/sensor/data", "/api/heartrate/data/**","/api/chatbot/ask", "/api/email/contact/send-email" , "/api/heartrate/data" , "/api/sensor/data/**").permitAll()
                 .requestMatchers("/api/**").authenticated() 
                 .requestMatchers("/api/messages/send").authenticated() // Make sure the endpoint is accessible
 
